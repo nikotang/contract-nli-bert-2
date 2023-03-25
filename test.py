@@ -35,10 +35,11 @@ logger = logging.getLogger(__name__)
 
 @click.command()
 @click.option('--dev-dataset-path', type=click.Path(exists=True), default=None)
+@click.option('--weights', type=str, help='a Huggingface path to model weights', default=None)
 @click.argument('model-dir', type=click.Path(exists=True))
 @click.argument('dataset-path', type=click.Path(exists=True))
 @click.argument('output-prefix', type=str)
-def main(dev_dataset_path, model_dir, dataset_path, output_prefix):
+def main(dev_dataset_path, weights, model_dir, dataset_path, output_prefix):
     conf: dict = load_conf(os.path.join(model_dir, 'conf.yml'))
 
     device = torch.device("cuda" if torch.cuda.is_available() and not conf['no_cuda'] else "cpu")
@@ -58,8 +59,14 @@ def main(dev_dataset_path, model_dir, dataset_path, output_prefix):
     logger.info("Loading models with following conf %s",
                 {k: v for k, v in conf.items() if k != 'raw_yaml'})
 
+    # use other pretrained weights for the model and tokenizer
+    if weights is not None:
+        pretrained = weights
+    else:
+        pretrained = model_dir
+
     tokenizer = AutoTokenizer.from_pretrained(
-        model_dir,
+        pretrained,
         do_lower_case=conf['do_lower_case'],
         cache_dir=conf['cache_dir'],
         use_fast=False
@@ -70,11 +77,11 @@ def main(dev_dataset_path, model_dir, dataset_path, output_prefix):
     )
     if conf['task'] == 'identification_classification':
         model = MODEL_TYPE_TO_CLASS[config.model_type].from_pretrained(
-            model_dir, cache_dir=conf['cache_dir']
+            pretrained, cache_dir=conf['cache_dir']
         )
     else:
         model = BertForClassification.from_pretrained(
-            model_dir, cache_dir=conf['cache_dir'])
+            pretrained, cache_dir=conf['cache_dir'])
 
     model.to(device)
 
