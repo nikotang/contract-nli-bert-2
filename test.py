@@ -23,6 +23,7 @@ from transformers import AutoConfig, AutoTokenizer
 from contract_nli.conf import load_conf
 from contract_nli.dataset.dataset import load_and_cache_examples, \
     load_and_cache_features
+from contract_nli.dataset.encoder import SPAN_TOKEN
 from contract_nli.evaluation import evaluate_all
 from contract_nli.model.classification import BertForClassification
 from contract_nli.model.identification_classification import \
@@ -31,7 +32,6 @@ from contract_nli.postprocess import format_json, compute_prob_calibration_coeff
 from contract_nli.predictor import predict, predict_classification
 
 logger = logging.getLogger(__name__)
-
 
 @click.command()
 @click.option('--dev-dataset-path', type=click.Path(exists=True), default=None)
@@ -65,23 +65,48 @@ def main(dev_dataset_path, weights, model_dir, dataset_path, output_prefix):
     else:
         pretrained = model_dir
 
+    logger.info("***** Load Tokenizer *****")
+
     tokenizer = AutoTokenizer.from_pretrained(
         pretrained,
         do_lower_case=conf['do_lower_case'],
         cache_dir=conf['cache_dir'],
         use_fast=False
     )
+
+    logger.info(f'len of tokenizer: {len(tokenizer)}')
+
+    #if conf['task'] == 'identification_classification':
+    n_added_token = tokenizer.add_special_tokens(
+        {'additional_special_tokens': tokenizer.additional_special_tokens + [SPAN_TOKEN]})
+    if n_added_token == 0:
+        logger.warning(
+            f'SPAN_TOKEN "{SPAN_TOKEN}" was not added. You can safely ignore'
+            ' this warning if you are retraining a model from this train.py')
+    else:
+        span_token_id = tokenizer.additional_special_tokens_ids[
+            tokenizer.additional_special_tokens.index(SPAN_TOKEN)]
+
+    logger.info(f'len of tokenizer: {len(tokenizer)}')
+
+    logger.info("***** Load config *****")
+
     config = AutoConfig.from_pretrained(
         model_dir,
         cache_dir=conf['cache_dir']
     )
+
+    logger.info("***** Pick model *****")
+
     if conf['task'] == 'identification_classification':
         model = MODEL_TYPE_TO_CLASS[config.model_type].from_pretrained(
-            pretrained, cache_dir=conf['cache_dir']
+            pretrained, config=model_dir, cache_dir=conf['cache_dir']
         )
     else:
         model = BertForClassification.from_pretrained(
-            pretrained, cache_dir=conf['cache_dir'])
+            pretrained, config=model_dir, cache_dir=conf['cache_dir'])
+
+    model.resize_token_embeddings(len(tokenizer))
 
     model.to(device)
 
@@ -143,6 +168,8 @@ def main(dev_dataset_path, weights, model_dir, dataset_path, output_prefix):
         labels_available=True,
         cache_dir='.'
     )
+
+    logger.info("***** Start prediction *****")
 
     if conf['task'] == 'identification_classification':
         all_results = predict(
