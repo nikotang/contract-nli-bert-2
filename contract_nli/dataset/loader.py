@@ -31,8 +31,10 @@ class NLILabel(enum.Enum):
             return cls.ENTAILMENT
         elif s == 'Contradiction':
             return cls.CONTRADICTION
+        elif s == None:
+            return cls.NONE
         else:
-            raise ValueError(f'Invalid input "{"s"}" to NLILabel.from_str.')
+            raise ValueError(f'Invalid input \"{s}\" to NLILabel.from_str.')
 
     def to_anno_name(self):
         if self == NLILabel.NOT_MENTIONED:
@@ -41,6 +43,8 @@ class NLILabel(enum.Enum):
             return 'Entailment'
         elif self == NLILabel.CONTRADICTION:
             return 'Contradiction'
+        elif self == NLILabel.NONE:
+            return None
         else:
             assert not 'Should not get here'
 
