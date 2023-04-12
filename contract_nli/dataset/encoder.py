@@ -104,7 +104,7 @@ class IdentificationClassificationFeatures:
         self.class_label = class_label
         self.span_labels = span_labels
         if valid_span_missing_in_context:
-            assert class_label in [NLILabel.ENTAILMENT.value, NLILabel.CONTRADICTION.value]
+            assert class_label in [NLILabel.ENTAILMENT.value, NLILabel.CONTRADICTION.value, NLILabel.NONE.value]
         self.valid_span_missing_in_context = valid_span_missing_in_context
         self.data_id = data_id
 
