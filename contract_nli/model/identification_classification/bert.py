@@ -82,7 +82,7 @@ class BertForIdentificationClassification(BertPreTrainedModel):
 
         loss_cls, loss_span = None, None
 
-        if class_labels is not None:
+        if class_labels is not None and ((type(class_labels) == torch.Tensor and (3 != class_labels).any()) or 3 != class_labels):
             print(f'class_labels is {class_labels}.')
         #     assert p_mask is not None
         #     assert span_labels is not None
