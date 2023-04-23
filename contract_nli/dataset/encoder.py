@@ -312,7 +312,7 @@ def convert_example_to_features(
         valid_span_missing_in_context = False
         span_labels = np.zeros_like(span["input_ids"])
         if labels_available:
-            if example.label != NLILabel.NOT_MENTIONED:
+            if example.label != (NLILabel.NOT_MENTIONED or NLILabel.NONE):
                 doc_start = span["start"]
                 doc_end = span["start"] + span["paragraph_len"]
                 annotated_spans = set(example.annotated_spans)
