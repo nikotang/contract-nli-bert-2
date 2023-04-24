@@ -235,16 +235,23 @@ def convert_example_to_features(
         else:
             texts = split_tokens
             pairs = truncated_query
-
-        encoded_dict = tokenizer.encode_plus(
-            texts,
-            pairs,
-            truncation=False,
-            padding=padding_strategy,
-            max_length=max_seq_length,
-            return_overflowing_tokens=False,
-            return_token_type_ids=True
-        )
+        try:
+            encoded_dict = tokenizer.encode_plus(
+                texts,
+                pairs,
+                truncation=False,
+                padding=padding_strategy,
+                max_length=max_seq_length,
+                return_overflowing_tokens=False,
+                return_token_type_ids=True
+            )
+        except ValueError:
+            print(f'Error: text: {texts[:5]}\npairs: {pairs[:5]}')
+            print(all_doc_tokens[:10])
+            print(start, (start + max_context_length), len(all_doc_tokens))
+            # len(all_doc_tokens) < start, causing the issue
+            print('covered splits: ', sorted(list(covered_splits))[-10:])
+            print('upcoming splits: ', len(upcoming_splits), upcoming_splits[:10])
         assert len(encoded_dict['input_ids']) <= max_seq_length
 
         paragraph_len = len(split_tokens)
@@ -312,22 +319,28 @@ def convert_example_to_features(
         valid_span_missing_in_context = False
         span_labels = np.zeros_like(span["input_ids"])
         if labels_available:
-            if example.label != (NLILabel.NOT_MENTIONED or NLILabel.NONE):
-                doc_start = span["start"]
-                doc_end = span["start"] + span["paragraph_len"]
-                annotated_spans = set(example.annotated_spans)
-                _span_labels = np.array([
-                    any((s in annotated_spans for s in span_to_orig_index.get(i, [])))
-                    for i in range(doc_start, doc_end)
-                ]).astype(int)
-                if not np.any(_span_labels):
-                    valid_span_missing_in_context = True
-                tok_start = query_with_special_tokens_length
-                tok_end = tok_start + span["paragraph_len"]
-                if tokenizer.padding_side == "right":
-                    span_labels[tok_start:tok_end] = _span_labels
-                else:
-                    span_labels[-tok_end:-tok_start] = _span_labels
+            if example.annotated_spans is not None:
+                if example.label != NLILabel.NOT_MENTIONED:
+                # if we predict spans: NLI == None will get the example into here
+                # span_labels == np.zeros_like while valid_span_missing_in_context == True
+                # does that affect anything?
+                    doc_start = span["start"]
+                    doc_end = span["start"] + span["paragraph_len"]
+                    annotated_spans = set(example.annotated_spans)
+                    _span_labels = np.array([
+                        any((s in annotated_spans for s in span_to_orig_index.get(i, [])))
+                        for i in range(doc_start, doc_end)
+                    ]).astype(int)
+                    if not np.any(_span_labels): # and (not example.label != NLILabel.NONE)
+                        valid_span_missing_in_context = True
+                    tok_start = query_with_special_tokens_length
+                    tok_end = tok_start + span["paragraph_len"]
+                    if tokenizer.padding_side == "right":
+                        span_labels[tok_start:tok_end] = _span_labels
+                    else:
+                        span_labels[-tok_end:-tok_start] = _span_labels
+            else:
+                span_labels[0] = -1 # to be checked in bert.py to skip loss_span
             class_label = example.label.value
         else:
             class_label = -1
