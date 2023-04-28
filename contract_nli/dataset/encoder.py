@@ -213,7 +213,7 @@ def convert_example_to_features(
             covered_splits.add(upcoming_splits[0])
         elif second_split - start > max_context_length:
             # we can fit the first upcoming span if we modify "start"
-            start += (second_split - max_context_length)
+            start = second_split - max_context_length
             last_span_idx = second_split
             covered_splits.add(upcoming_splits[0])
         else:
@@ -235,23 +235,16 @@ def convert_example_to_features(
         else:
             texts = split_tokens
             pairs = truncated_query
-        try:
-            encoded_dict = tokenizer.encode_plus(
-                texts,
-                pairs,
-                truncation=False,
-                padding=padding_strategy,
-                max_length=max_seq_length,
-                return_overflowing_tokens=False,
-                return_token_type_ids=True
-            )
-        except ValueError:
-            print(f'Error: text: {texts[:5]}\npairs: {pairs[:5]}')
-            print(all_doc_tokens[:10])
-            print(start, (start + max_context_length), len(all_doc_tokens))
-            # len(all_doc_tokens) < start, causing the issue
-            print('covered splits: ', sorted(list(covered_splits))[-10:])
-            print('upcoming splits: ', len(upcoming_splits), upcoming_splits[:10])
+
+        encoded_dict = tokenizer.encode_plus(
+            texts,
+            pairs,
+            truncation=False,
+            padding=padding_strategy,
+            max_length=max_seq_length,
+            return_overflowing_tokens=False,
+            return_token_type_ids=True
+        )
         assert len(encoded_dict['input_ids']) <= max_seq_length
 
         paragraph_len = len(split_tokens)
@@ -340,6 +333,7 @@ def convert_example_to_features(
                     else:
                         span_labels[-tok_end:-tok_start] = _span_labels
             else:
+                print('no span evidence')
                 span_labels[0] = -1 # to be checked in bert.py to skip loss_span
             class_label = example.label.value
         else:
