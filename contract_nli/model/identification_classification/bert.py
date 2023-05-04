@@ -83,7 +83,6 @@ class BertForIdentificationClassification(BertPreTrainedModel):
         loss_cls, loss_span = None, None
 
         if class_labels is not None and ((type(class_labels) == torch.Tensor and (-1 != class_labels).any()) or -1 != class_labels):
-            print('looking at labels')
         #     assert p_mask is not None
         #     assert span_labels is not None
             assert valid_span_missing_in_context is not None
@@ -102,7 +101,6 @@ class BertForIdentificationClassification(BertPreTrainedModel):
             loss_cls = self.class_loss_weight * loss_fct(logits_cls, class_labels)
 
         if span_labels is not None and (type(span_labels) == torch.Tensor and not (-1 == span_labels).any()):
-            print('looking at spans')
             assert p_mask is not None
 
             loss_fct = nn.CrossEntropyLoss()

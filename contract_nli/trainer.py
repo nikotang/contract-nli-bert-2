@@ -261,9 +261,10 @@ class Trainer(object):
         inputs = self.converter(batch, self.model, self.device)
         outputs = self.model(**inputs)
 
-        loss, loss_cls, loss_span = outputs.loss, outputs.loss_cls, outputs.loss_span
-        # if self.task == 'identification_classification':
-        #     loss_span = outputs.loss_span
+        loss, loss_cls = outputs.loss, outputs.loss_cls
+        loss_span = None
+        if self.task == 'identification_classification':
+            loss_span = outputs.loss_span
 
         if self.n_gpu > 1:
             loss = loss.mean()  # mean() to average on multi-gpu parallel (not distributed) training
