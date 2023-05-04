@@ -333,7 +333,6 @@ def convert_example_to_features(
                     else:
                         span_labels[-tok_end:-tok_start] = _span_labels
             else:
-                print('no span evidence')
                 span_labels[0] = -1 # to be checked in bert.py to skip loss_span
             class_label = example.label.value
         else:

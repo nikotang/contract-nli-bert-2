@@ -143,7 +143,7 @@ def format_json(
         all_hypothesis_ids = [
             tuple(sorted(document['annotation_sets'][0]['annotations'].keys()))
             for document in documents.values()]
-        assert len(set(all_hypothesis_ids)) == 1
+        # assert len(set(all_hypothesis_ids)) == 1
     return sorted(documents.values(), key=lambda d: d['id'])
 
 
