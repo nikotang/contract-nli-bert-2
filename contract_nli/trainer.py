@@ -197,11 +197,10 @@ class Trainer(object):
                     step += 1
                     continue
 
-                loss, loss_cls, loss_span = self.run_batch(batch, train=True)
+                loss = self.run_batch(batch, train=True)
 
                 if self.gradient_accumulation_steps > 1:
                     loss = loss / self.gradient_accumulation_steps
-                    #sth here
 
                 if self.fp16:
                     with self.amp.scale_loss(loss, self.optimizer) as scaled_loss:
@@ -293,7 +292,7 @@ class Trainer(object):
                     #         labels.flat[mask.flat == 0],
                     #         probs.flat[mask.flat == 0]))
 
-        return loss, loss_cls, loss_span
+        return loss
 
     @property
     def best_checkpoint_dir(self) -> str:
