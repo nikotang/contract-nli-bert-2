@@ -9,7 +9,7 @@ def main():
     The last argument should be the path and name of the new dataset file. 
     '''
     datasets = []
-    print(argv)
+
     for arg in argv[1:-1]:
         with open(arg, 'r') as f:
             dataset = json.load(f)
