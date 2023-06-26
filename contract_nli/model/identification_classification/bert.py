@@ -80,11 +80,9 @@ class BertForIdentificationClassification(BertPreTrainedModel):
         sequence_output = self.dropout(sequence_output)
         logits_span = self.span_outputs(sequence_output)
 
-        loss_cls, loss_span = None, None
-
-        if class_labels is not None and ((type(class_labels) == torch.Tensor and (-1 != class_labels).any()) or -1 != class_labels):
-        #     assert p_mask is not None
-        #     assert span_labels is not None
+        if class_labels is not None:
+            assert p_mask is not None
+            assert span_labels is not None
             assert valid_span_missing_in_context is not None
 
             loss_fct = nn.CrossEntropyLoss()
@@ -100,9 +98,6 @@ class BertForIdentificationClassification(BertPreTrainedModel):
                 )
             loss_cls = self.class_loss_weight * loss_fct(logits_cls, class_labels)
 
-        if span_labels is not None and (type(span_labels) == torch.Tensor and not (-1 == span_labels).any()):
-            assert p_mask is not None
-
             loss_fct = nn.CrossEntropyLoss()
             active_logits = logits_span.view(-1, 2)
             active_labels = torch.where(
@@ -110,12 +105,9 @@ class BertForIdentificationClassification(BertPreTrainedModel):
                 torch.tensor(loss_fct.ignore_index).type_as(span_labels)
             )
             loss_span = loss_fct(active_logits, active_labels)
-
-        #     loss = loss_cls + loss_span
-        # else:
-        #     loss, loss_cls, loss_span = None, None, None
-
-        loss = (loss_cls or 0) + (loss_span or 0) if loss_cls or loss_span else None
+            loss = loss_cls + loss_span
+        else:
+            loss, loss_cls, loss_span = None, None, None
 
         return IdentificationClassificationModelOutput(
             loss=loss,

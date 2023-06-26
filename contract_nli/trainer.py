@@ -61,8 +61,8 @@ class Trainer(object):
             gradient_accumulation_steps: int=1, warmup_steps: int=0, max_grad_norm: Optional[float]=None,
             n_gpu: int=1, local_rank: int=-1, fp16: bool=False, fp16_opt_level=None, device=torch.device("cpu"),
             save_steps: Optional[int] = None):
-        # if local_rank in [-1, 0]:
-            # self.tb_writer = SummaryWriter(os.path.join(output_dir, 'tensorboard'))
+        if local_rank in [-1, 0]:
+            self.tb_writer = SummaryWriter(os.path.join(output_dir, 'tensorboard'))
         if task not in ['identification_classification', 'classification']:
             raise ValueError("task must be either 'classification' or 'identification_classification'")
 
@@ -220,8 +220,8 @@ class Trainer(object):
                     self.optimizer.step()
                     self.scheduler.step()  # Update learning rate schedule
                     self.model.zero_grad()
-                    # if self.is_top:
-                    #     self.tb_writer.write(self.global_step)
+                    if self.is_top:
+                        self.tb_writer.write(self.global_step)
                     self.global_step += 1
                     pbar.update()
 
@@ -242,14 +242,14 @@ class Trainer(object):
     def evaluate(self):
         epoch_iterator = tqdm(
             self.dev_dataloader, desc="Iteration (dev)", disable=not self.is_top)
-        # if self.is_top:
-        #     self.tb_writer.clear()
+        if self.is_top:
+            self.tb_writer.clear()
         losses = []
         for _, batch in enumerate(epoch_iterator):
             loss = self.run_batch(batch, train=False)
             losses.append(loss.item())
-        # if self.is_top:
-        #     self.tb_writer.write(self.global_step)
+        if self.is_top:
+            self.tb_writer.write(self.global_step)
         return np.mean(losses)
 
     def run_batch(self, batch, train: bool):
@@ -260,8 +260,7 @@ class Trainer(object):
         inputs = self.converter(batch, self.model, self.device)
         outputs = self.model(**inputs)
 
-        loss, loss_cls = outputs.loss, outputs.loss_cls
-        loss_span = None
+        loss, loss_cls = outputs.loss, outputs.loss_cls,
         if self.task == 'identification_classification':
             loss_span = outputs.loss_span
 
@@ -273,24 +272,24 @@ class Trainer(object):
 
         if self.is_top:
             prefix = 'train' if train else 'eval'
-            # self.tb_writer.add_scalar(f"{prefix}/lr", self.scheduler.get_last_lr()[0])
-            # self.tb_writer.add_scalar(f"{prefix}/loss", loss.item())
-            # self.tb_writer.add_scalar(f"{prefix}/loss_cls", loss_cls.item())
-            # self.tb_writer.add_scalar(
-            #     f'{prefix}/accuracy_nli',
-            #     (np.argmax(outputs.class_logits.detach().cpu().numpy(), axis=1) == inputs['class_labels'].cpu().numpy()).mean())
+            self.tb_writer.add_scalar(f"{prefix}/lr", self.scheduler.get_last_lr()[0])
+            self.tb_writer.add_scalar(f"{prefix}/loss", loss.item())
+            self.tb_writer.add_scalar(f"{prefix}/loss_cls", loss_cls.item())
+            self.tb_writer.add_scalar(
+                f'{prefix}/accuracy_nli',
+                (np.argmax(outputs.class_logits.detach().cpu().numpy(), axis=1) == inputs['class_labels'].cpu().numpy()).mean())
             if self.task == 'identification_classification':
-                # self.tb_writer.add_scalar(f"{prefix}/loss_span", loss_span.item())
+                self.tb_writer.add_scalar(f"{prefix}/loss_span", loss_span.item())
                 mask = inputs['p_mask'].cpu().numpy()
                 probs = scipy.special.softmax(outputs.span_logits.detach().cpu().numpy(), axis=2)[:, :, 1]
                 labels = inputs['span_labels'].cpu().numpy().copy()
                 labels[:, 0] = 1
-                # if len(set(labels.flat[mask.flat == 0])) > 1:
-                    # self.tb_writer.add_scalar(
-                    #     f'{prefix}/map_span',
-                    #     sklearn.metrics.average_precision_score(
-                    #         labels.flat[mask.flat == 0],
-                    #         probs.flat[mask.flat == 0]))
+                if len(set(labels.flat[mask.flat == 0])) > 1:
+                    self.tb_writer.add_scalar(
+                        f'{prefix}/map_span',
+                        sklearn.metrics.average_precision_score(
+                            labels.flat[mask.flat == 0],
+                            probs.flat[mask.flat == 0]))
 
         return loss
 

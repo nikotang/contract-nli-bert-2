@@ -64,7 +64,7 @@ def evaluate_spans(y_true, y_prob) -> Dict[str, float]:
     assert len(y_true) == len(y_prob)
     metrics = evaluate_predicted_spans(y_true, y_prob > 0.5)
     metrics.update({
-        # 'roc_auc': sklearn.metrics.roc_auc_score(y_true, y_prob),
+        'roc_auc': sklearn.metrics.roc_auc_score(y_true, y_prob),
         'map': sklearn.metrics.average_precision_score(y_true, y_prob),
         'precision@recall80': precision_at_recall(y_true, y_prob, 0.8),
         'precision@recall90': precision_at_recall(y_true, y_prob, 0.9)
@@ -146,24 +146,24 @@ def evaluate_all(
     assert task in ['identification_classification', 'classification', 'identification']
     id_to_result = {r['id']: r for r in results}
     label_ids = sorted(results[0]['annotation_sets'][0]['annotations'].keys())
-    # class_names = [NLILabel(i).to_anno_name() for i in range(len(NLILabel))]
+    class_names = [NLILabel(i).to_anno_name() for i in range(len(NLILabel))]
     assert label_ids == sorted(dataset['labels'].keys()) or task == 'classification'
     if task in ['identification_classification', 'identification']:
         span_probs = defaultdict(list)
         span_labels = defaultdict(list)
-    # if task in ['identification_classification', 'classification']:
-    #     class_probs = defaultdict(list)
-    #     class_labels = defaultdict(list)
+    if task in ['identification_classification', 'classification']:
+        class_probs = defaultdict(list)
+        class_labels = defaultdict(list)
     for document in dataset['documents']:
         result = id_to_result[document['id']]['annotation_sets'][0]['annotations']
         annotations = document['annotation_sets'][0]['annotations']
         for label_id in label_ids:
             if task == 'classification' and label_id not in result:
                 continue
-            # if task in ['identification_classification', 'classification']:
-            #     class_labels[label_id].append(NLILabel.from_str(annotations[label_id]['choice']).value)
-            #     class_probs[label_id].append(
-            #         np.array([result[label_id]['class_probs'][n] for n in class_names]))
+            if task in ['identification_classification', 'classification']:
+                class_labels[label_id].append(NLILabel.from_str(annotations[label_id]['choice']).value)
+                class_probs[label_id].append(
+                    np.array([result[label_id]['class_probs'][n] for n in class_names]))
             if task in ['identification_classification', 'identification']:
                 # FIXME: this calculates precision optimistically
                 if NLILabel.from_str(annotations[label_id]['choice']) != NLILabel.NOT_MENTIONED:
@@ -172,17 +172,17 @@ def evaluate_all(
                         span_label[s] = 1
                     span_labels[label_id].append(span_label)
                     span_probs[label_id].append(np.array(result[label_id]['span_probs']))
-    # if task in ['identification_classification', 'classification']:
-        # binary_label_ids = [
-        #     l for l in label_ids
-        #     if NLILabel.CONTRADICTION.value in class_labels[l] and
-        #        NLILabel.ENTAILMENT.value in class_labels[l]]
+    if task in ['identification_classification', 'classification']:
+        binary_label_ids = [
+            l for l in label_ids
+            if NLILabel.CONTRADICTION.value in class_labels[l] and
+               NLILabel.ENTAILMENT.value in class_labels[l]]
         # this is not necessarily true with some training dataset
         # but we have to assume this for our evaluation to be a fair comparison
-        # if not set(class_probs.keys()).issuperset(set(binary_label_ids)):
-        #     raise ValueError(
-        #         'Some label ids are not in prediction when they are valid label '
-        #         f'ids. Pred: {class_probs.keys()}, Dataset: {binary_label_ids}')
+        if not set(class_probs.keys()).issuperset(set(binary_label_ids)):
+            raise ValueError(
+                'Some label ids are not in prediction when they are valid label '
+                f'ids. Pred: {class_probs.keys()}, Dataset: {binary_label_ids}')
     if task in ['identification_classification', 'identification']:
         preds_at_ks = {
             k: {label_id: [predict_at_k(y_prob, k) for y_prob in y_probs]
@@ -193,19 +193,19 @@ def evaluate_all(
     metrics = dict()
 
     metrics['micro_label_micro_doc'] = dict()
-    # if task in ['identification_classification', 'classification']:
-    #     metrics['micro_label_micro_doc']['class_binary'] = evaluate_class(
-    #         np.concatenate([np.array(class_labels[l])[np.array(class_labels[l]) != NLILabel.NOT_MENTIONED.value]
-    #                         for l in binary_label_ids]),
-    #         remove_not_mentioned(
-    #             np.vstack([np.stack(class_probs[l])[np.array(class_labels[l]) != NLILabel.NOT_MENTIONED.value, :]
-    #                        for l in binary_label_ids]))
-    #     )
-    # if task == 'identification_classification':
-    #     metrics['micro_label_micro_doc']['class'] = evaluate_class(
-    #         np.concatenate([class_labels[l] for l in label_ids]),
-    #         np.vstack([np.stack(class_probs[l]) for l in label_ids])
-    #     )
+    if task in ['identification_classification', 'classification']:
+        metrics['micro_label_micro_doc']['class_binary'] = evaluate_class(
+            np.concatenate([np.array(class_labels[l])[np.array(class_labels[l]) != NLILabel.NOT_MENTIONED.value]
+                            for l in binary_label_ids]),
+            remove_not_mentioned(
+                np.vstack([np.stack(class_probs[l])[np.array(class_labels[l]) != NLILabel.NOT_MENTIONED.value, :]
+                           for l in binary_label_ids]))
+        )
+    if task == 'identification_classification':
+        metrics['micro_label_micro_doc']['class'] = evaluate_class(
+            np.concatenate([class_labels[l] for l in label_ids]),
+            np.vstack([np.stack(class_probs[l]) for l in label_ids])
+        )
     if task in ['identification_classification', 'identification']:
         y_true = np.concatenate([l for k in label_ids for l in span_labels[k]])
         metrics['micro_label_micro_doc']['span'] = evaluate_spans(
@@ -218,18 +218,18 @@ def evaluate_all(
                 f'{n}@{k}': v for n, v in evaluate_predicted_spans(y_true, y_pred).items()
             })
     metrics['macro_label_micro_doc'] = dict()
-    # if task in ['identification_classification', 'classification']:
-    #     metrics['macro_label_micro_doc']['class_binary'] = _macro_average([
-    #         evaluate_class(
-    #             np.array(class_labels[l])[np.array(class_labels[l]) != NLILabel.NOT_MENTIONED.value],
-    #             remove_not_mentioned(np.stack(class_probs[l])[np.array(class_labels[l]) != NLILabel.NOT_MENTIONED.value, :]))
-    #         for l in binary_label_ids
-    #     ])
-    # if task == 'identification_classification':
-    #     metrics['macro_label_micro_doc']['class'] = _macro_average([
-    #         evaluate_class(np.array(class_labels[l]), np.stack(class_probs[l]))
-    #         for l in label_ids
-    #     ])
+    if task in ['identification_classification', 'classification']:
+        metrics['macro_label_micro_doc']['class_binary'] = _macro_average([
+            evaluate_class(
+                np.array(class_labels[l])[np.array(class_labels[l]) != NLILabel.NOT_MENTIONED.value],
+                remove_not_mentioned(np.stack(class_probs[l])[np.array(class_labels[l]) != NLILabel.NOT_MENTIONED.value, :]))
+            for l in binary_label_ids
+        ])
+    if task == 'identification_classification':
+        metrics['macro_label_micro_doc']['class'] = _macro_average([
+            evaluate_class(np.array(class_labels[l]), np.stack(class_probs[l]))
+            for l in label_ids
+        ])
     if task in ['identification_classification', 'identification']:
         metrics['macro_label_micro_doc']['span'] = _macro_average([
             {
@@ -267,13 +267,13 @@ def evaluate_all(
         ])
 
     metrics['micro_label_macro_doc'] = dict()
-    # if task == 'identification_classification':
-    #     metrics['micro_label_macro_doc']['class'] = _macro_average([
-    #         evaluate_class(
-    #             np.array([class_labels[l][i] for l in label_ids]),
-    #             np.stack([class_probs[l][i] for l in label_ids]))
-    #         for i in range(len(class_labels[label_ids[0]]))
-    #     ])
+    if task == 'identification_classification':
+        metrics['micro_label_macro_doc']['class'] = _macro_average([
+            evaluate_class(
+                np.array([class_labels[l][i] for l in label_ids]),
+                np.stack([class_probs[l][i] for l in label_ids]))
+            for i in range(len(class_labels[label_ids[0]]))
+        ])
     if task in ['identification_classification', 'identification']:
         metrics['micro_label_macro_doc']['span'] = _macro_average([
             evaluate_spans(_l, _p)
@@ -297,17 +297,17 @@ def evaluate_all(
     for l in label_ids:
         metrics['label_wise'][l] = dict()
         metrics['label_wise'][l]['micro_doc'] = dict()
-        # if task in ['identification_classification', 'classification']:
-        #     metrics['label_wise'][l]['micro_doc']['class_binary'] = evaluate_class(
-        #         np.array(class_labels[l])[np.array(class_labels[l]) != NLILabel.NOT_MENTIONED.value],
-        #         remove_not_mentioned(np.stack(class_probs[l])[np.array(class_labels[l]) != NLILabel.NOT_MENTIONED.value, :]))
-        #     if not (NLILabel.CONTRADICTION.value in class_labels[l] and NLILabel.ENTAILMENT.value in class_labels[l]):
-        #         metrics['label_wise'][l]['micro_doc']['class_binary'] = {
-        #             k: np.nan for k in metrics['label_wise'][l]['micro_doc']['class_binary'].keys()
-        #         }
-        # if task == 'identification_classification':
-        #     metrics['label_wise'][l]['micro_doc']['class'] = evaluate_class(
-        #         np.array(class_labels[l]), np.stack(class_probs[l]))
+        if task in ['identification_classification', 'classification']:
+            metrics['label_wise'][l]['micro_doc']['class_binary'] = evaluate_class(
+                np.array(class_labels[l])[np.array(class_labels[l]) != NLILabel.NOT_MENTIONED.value],
+                remove_not_mentioned(np.stack(class_probs[l])[np.array(class_labels[l]) != NLILabel.NOT_MENTIONED.value, :]))
+            if not (NLILabel.CONTRADICTION.value in class_labels[l] and NLILabel.ENTAILMENT.value in class_labels[l]):
+                metrics['label_wise'][l]['micro_doc']['class_binary'] = {
+                    k: np.nan for k in metrics['label_wise'][l]['micro_doc']['class_binary'].keys()
+                }
+        if task == 'identification_classification':
+            metrics['label_wise'][l]['micro_doc']['class'] = evaluate_class(
+                np.array(class_labels[l]), np.stack(class_probs[l]))
         if task in ['identification_classification', 'identification']:
             y_true = np.concatenate(span_labels[l])
             metrics['label_wise'][l]['micro_doc']['span'] = {
