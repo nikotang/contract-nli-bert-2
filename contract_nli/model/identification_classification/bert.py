@@ -71,21 +71,17 @@ class BertForIdentificationClassification(BertPreTrainedModel):
             return_dict=True,
         )
 
-        sequence_output = outputs.last_hidden_state
-        pooled_output = outputs.pooler_output
-
-        pooled_output = self.dropout(pooled_output)
-        logits_cls = self.class_outputs(pooled_output)
-
-        sequence_output = self.dropout(sequence_output)
-        logits_span = self.span_outputs(sequence_output)
-
+        logits_cls, logits_span = None, None
         loss_cls, loss_span = None, None
 
-        if class_labels is not None and ((type(class_labels) == torch.Tensor and (-1 != class_labels).any()) or -1 != class_labels):
+        if class_labels is not None and (type(class_labels) == torch.Tensor and (3 != class_labels).any()):
         #     assert p_mask is not None
         #     assert span_labels is not None
             assert valid_span_missing_in_context is not None
+
+            pooled_output = outputs.pooler_output
+            pooled_output = self.dropout(pooled_output)
+            logits_cls = self.class_outputs(pooled_output)
 
             loss_fct = nn.CrossEntropyLoss()
             if self.impossible_strategy == 'ignore':
@@ -100,8 +96,12 @@ class BertForIdentificationClassification(BertPreTrainedModel):
                 )
             loss_cls = self.class_loss_weight * loss_fct(logits_cls, class_labels)
 
-        if span_labels is not None and (type(span_labels) == torch.Tensor and not (-1 == span_labels).any()):
+        if span_labels is not None and (type(span_labels) == torch.Tensor and (-1 != span_labels).all()):
             assert p_mask is not None
+
+            sequence_output = outputs.last_hidden_state
+            sequence_output = self.dropout(sequence_output)
+            logits_span = self.span_outputs(sequence_output)
 
             loss_fct = nn.CrossEntropyLoss()
             active_logits = logits_span.view(-1, 2)

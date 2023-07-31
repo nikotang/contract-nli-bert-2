@@ -22,7 +22,7 @@ class NLILabel(enum.Enum):
     NOT_MENTIONED = 0
     ENTAILMENT = 1
     CONTRADICTION = 2
-    NONE = -1
+    NONE = 3
 
     @classmethod
     def from_str(cls, s: str):
