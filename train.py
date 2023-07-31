@@ -250,12 +250,6 @@ def main(conf, output_dir, local_rank, shared_filesystem):
     if local_rank != -1:
         trainer.local_rank = -1
 
-    if conf['early_stopping'] and os.path.exists(trainer.best_checkpoint_dir):
-        logger.info(f"Loading best model from {trainer.best_checkpoint_dir}")
-        trainer.load(trainer.best_checkpoint_dir)
-        trainer.deploy()
-        model = trainer.model
-
     logger.info("Saving model checkpoint to %s", output_dir)
     # Save a trained model, configuration and tokenizer using `save_pretrained()`.
     # They can then be reloaded using `from_pretrained()`
@@ -265,6 +259,12 @@ def main(conf, output_dir, local_rank, shared_filesystem):
     tokenizer.save_pretrained(output_dir)
     with open(os.path.join(output_dir, "conf.yml"), 'w') as fout:
         fout.write(conf['raw_yaml'])
+
+    if conf['early_stopping'] and os.path.exists(trainer.best_checkpoint_dir):
+        logger.info(f"Loading best model from {trainer.best_checkpoint_dir}")
+        trainer.load(trainer.best_checkpoint_dir)
+        trainer.deploy()
+        model = trainer.model
 
     if dev_dataset is not None:
         logger.info("Evaluate the on validation data")
