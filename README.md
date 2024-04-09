@@ -1,3 +1,22 @@
+# Multitask Finetuning on ContractNLI
+
+This is code for the paper [Natural Language Inference Transfer Learning in a Multi-Task Contract Dataset: In the Case of ContractNLI: a Document Information Extraction System](https://www.diva-portal.org/smash/record.jsf?pid=diva2:1801289). The code is a fork from [Span NLI BERT](https://github.com/stanfordnlp/contract-nli-bert/tree/main) by [Koreeda and Manning (2021)](https://stanfordnlp.github.io/contract-nli/). 
+
+In short, Span NLI BERT is a strong baseline model for ContractNLI, a dataset of contracts labelled against common features formulated as NLI statements. This fork untangles the NLI classification and evidence identification tasks to finetune the model on [Adversarial NLI (ANLI)](https://aclanthology.org/2020.acl-main.441/) and [Contract Understanding Atticus Dataset (CUAD)](https://datasets-benchmarks-proceedings.neurips.cc/paper/2021/hash/6ea9ab1baa0efb9e19094440c317e21b-Abstract-round1.html) respectively.
+
+Results show that fine-tuning on general domain NLI improves BERT-large model
+performance for hypotheses that have a modest amount of both entailment and contradiction training examples, and that improving the model’s evidence identification
+ability also lifts its NLI classification ability. Examples where the fine-tuned model
+shows improvements in NLI classification indicate that additional general domain
+NLI helps prompt the evidence identification task to retrieve a wider scope of text,
+that is beneficial to capturing the semantic information for accurate NLI labelling.
+
+ANLI and CUAD are reformatted to the ContractNLI format.
+
+Below is the original readme.
+
+---
+
 # Span NLI BERT for ContractNLI
 
 ContractNLI is a dataset for document-level natural language inference (NLI) on contracts whose goal is to automate/support a time-consuming procedure of contract review.
